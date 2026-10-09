@@ -1,0 +1,64 @@
+name: Build Desktop macOS Intel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    env:
+      DSH_DESKTOP_TARGET_PLATFORM: darwin
+      DSH_DESKTOP_TARGET_ARCH: x64
+      DSH_TELEMETRY_DISABLED: '1'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Verify Intel build host
+        run: node -e "require('node:assert/strict').equal(process.platform + '-' + process.arch, 'darwin-x64')"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check unsigned packaging configuration
+        run: node --test apps/desktop/tests/unsigned-macos-config.test.mjs
+      - name: Build official workspace packages
+        run: pnpm run build:official
+      - name: Pack runtime dependencies
+        run: |
+          BUILD_ROOT="$PWD/apps/desktop/.desktop-build/targets/mac-x64"
+          pnpm run release:pack --family dsh --out "$BUILD_ROOT/packed/dsh" --concurrency 4
+          pnpm --dir apps/desktop-host pack --pack-destination "$BUILD_ROOT/packed/dsh"
+          pnpm run release:pack --family vendor --out "$BUILD_ROOT/packed/vendor" --concurrency 4
+          pnpm --dir native/system run build:ts
+          mkdir -p "$BUILD_ROOT/packed/landlock"
+          pnpm --dir native/system/packages/entry pack --pack-destination "$BUILD_ROOT/packed/landlock"
+      - name: Prepare bundled runtime
+        run: |
+          pnpm --dir apps/desktop run prepare:runtime
+          pnpm --dir apps/desktop run prepare:packages
+          pnpm --dir apps/desktop run prepare:dsh --unsigned-macos
+      - name: Package unsigned DMG and ZIP
+        run: pnpm --dir apps/desktop exec electron-builder --config electron-builder.unsigned-macos.mjs --mac --x64 --publish never
+      - name: Verify packaged architecture and runtime
+        run: |
+          APP="apps/desktop/.desktop-build/targets/mac-x64/artifacts/mac/DeepSeek Harness.app"
+          test "$(lipo -archs "$APP/Contents/MacOS/DeepSeek Harness")" = x86_64
+          pnpm --dir apps/desktop exec tsx scripts/smoke-packaged-runtime.ts
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-harness-macos-intel-${{ github.run_number }}
+          path: |
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*-mac-x64-unsigned.dmg
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*-mac-x64-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14

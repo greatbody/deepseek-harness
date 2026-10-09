@@ -182,6 +182,12 @@ The welcome window follows system appearance with the design’s Platform light/
 
 ## Package
 
+### Fork Intel macOS build
+
+In GitHub Actions, select **Build Desktop macOS Intel**, choose a branch, and click **Run workflow**. This manual-only workflow uses a native Intel macOS runner and uploads unsigned x64 DMG and ZIP installers as `deepseek-harness-macos-intel-<run number>` artifacts retained for 14 days. It needs no Apple credentials, performs bundled-runtime checks, and does not publish releases or enable official updates or mandatory update services. The application retains the checked-out package version. macOS Gatekeeper may block this unnotarized application; review the source before allowing it in Privacy & Security.
+
+The separate [unsigned configuration](electron-builder.unsigned-macos.mjs) leaves official release packaging unchanged. `prepare:dsh --unsigned-macos` skips Apple runtime signing only for `mac-x64` on macOS and retains runtime validation and smoke checks.
+
 <a id="release-versions"></a>
 
 ### Release versions

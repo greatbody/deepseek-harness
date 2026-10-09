@@ -184,6 +184,12 @@ Desktop 在 Host 启动后、打开工作区前检查模型 API Key 引用是否
 
 ## 打包
 
+### Fork Intel macOS build
+
+在 GitHub Actions 中选择 **Build Desktop macOS Intel**，选定分支并点击 **Run workflow**。该工作流仅支持手动触发，使用原生 Intel macOS runner，将未签名的 x64 DMG 和 ZIP 安装包上传为 `deepseek-harness-macos-intel-<运行编号>` 构建产物，保留 14 天。它不需要 Apple 凭据，会执行内置运行时检查，不发布 Release，也不启用官方自动更新或强制更新服务。应用保留检出代码中的包版本。macOS Gatekeeper 可能阻止这个未公证的应用；请审查源码后再在“隐私与安全性”中允许打开。
+
+独立的[未签名配置](electron-builder.unsigned-macos.mjs)不改变官方发布打包流程。`prepare:dsh --unsigned-macos` 仅在 macOS 上为 `mac-x64` 跳过 Apple 运行时签名，保留运行时校验和冒烟检查。
+
 <a id="release-versions"></a>
 
 ### 发布版本
