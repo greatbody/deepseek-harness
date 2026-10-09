@@ -10,6 +10,8 @@ jobs:
   build:
     runs-on: macos-15-intel
     timeout-minutes: 120
+    permissions:
+      contents: write
     env:
       DSH_DESKTOP_TARGET_PLATFORM: darwin
       DSH_DESKTOP_TARGET_ARCH: x64
@@ -53,12 +55,19 @@ jobs:
           APP="apps/desktop/.desktop-build/targets/mac-x64/artifacts/mac/DeepSeek Harness.app"
           test "$(lipo -archs "$APP/Contents/MacOS/DeepSeek Harness")" = x86_64
           pnpm --dir apps/desktop exec tsx scripts/smoke-packaged-runtime.ts
-      - name: Upload installers
-        uses: actions/upload-artifact@v4
-        with:
-          name: deepseek-harness-macos-intel-${{ github.run_number }}
-          path: |
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*-mac-x64-unsigned.dmg
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*-mac-x64-unsigned.zip
-          if-no-files-found: error
-          retention-days: 14
+      - name: Publish installers to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          ARTIFACTS="apps/desktop/.desktop-build/targets/mac-x64/artifacts"
+          DMG="$ARTIFACTS/deepseek-harness-$VERSION-mac-x64-unsigned.dmg"
+          ZIP="$ARTIFACTS/deepseek-harness-$VERSION-mac-x64-unsigned.zip"
+          test -s "$DMG"
+          test -s "$ZIP"
+          gh release create "macos-intel-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "$DMG" "$ZIP" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "DeepSeek Harness $VERSION macOS Intel (build $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
+            --notes "Unsigned, unnotarized Intel x64 macOS build of commit $GITHUB_SHA. Official automatic updates are disabled."
